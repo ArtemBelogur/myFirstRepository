@@ -1,0 +1,305 @@
+import javax.swing.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.List;
+
+public class App {
+    static final String DB_URL = "jdbc:postgresql://localhost/";
+    static final String USER = "postgres";
+    static final String PASS = "123456";
+    static final String DATABASE_NAME = "myDataBase";
+
+    private JTextField searchNameTextField;
+    private JPanel panel1;
+    private JButton clearDatabaseButton;
+    private JButton searchButton;
+    private JButton deleteDatabaseButton;
+    private JTabbedPane tabbedPane1;
+    private JButton deleteValuesButton;
+    private JButton addValueButton;
+    private JTextField nameField;
+    private JTextField teacherField;
+    private JTextField nameToDelete;
+    private JTextField updateNameField;
+    private JTextField updateTeacherField;
+    private JTextField oldNameTextField;
+    private JButton updateButton;
+    private JList<String> searchList;
+
+    public App() {
+        var app = this;
+        panel1.setSize(700, 700);
+        
+        deleteDatabaseButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                try {
+                    deleteDatabase();
+                    JOptionPane.showMessageDialog(app.panel1, "База данных была удалена");
+                } catch (SQLException throwables) {
+                    throwables.printStackTrace();
+                }
+            }
+        });
+        
+        clearDatabaseButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                try {
+                    clearTable();
+                    JOptionPane.showMessageDialog(app.panel1, "Таблица была очищена");
+                } catch (SQLException throwables) {
+                    throwables.printStackTrace();
+                }
+            }
+        });
+
+        addValueButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                try {
+                    addSubject(nameField.getText(), teacherField.getText());
+                    JOptionPane.showMessageDialog(app.panel1, "Предмет был добавлен в базу данных");
+                } catch (SQLException throwables) {
+                    throwables.printStackTrace();
+                }
+            }
+        });
+
+        deleteValuesButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                try {
+                    deleteAllByName(nameToDelete.getText());
+                    JOptionPane.showMessageDialog(app.panel1, "Запись была удалена из базы данных");
+                } catch (SQLException throwables) {
+                    throwables.printStackTrace();
+                }
+            }
+        });
+        
+        searchButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                DefaultListModel<String> model = new DefaultListModel<String>();
+                try {
+                    searchList.setVisibleRowCount(-1);
+                    searchList.setLayoutOrientation(JList.VERTICAL_WRAP);
+                    List<String> subjects = getAllByName(searchNameTextField.getText());
+                    for (String subject : subjects) {
+                        model.addElement(subject);
+                        System.out.println(subject);
+                    }
+                    searchList.setModel(model);
+                    JOptionPane.showMessageDialog(app.panel1, "Данные были найдены");
+                } catch (SQLException throwables) {
+                    throwables.printStackTrace();
+                }
+
+            }
+        });
+        
+        updateButton.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                try {
+                    editSubject(oldNameTextField.getText(), updateNameField.getText(), updateTeacherField.getText());
+                    JOptionPane.showMessageDialog(app.panel1, "Данные были обновлены");
+                } catch (SQLException throwables) {
+                    throwables.printStackTrace();
+                }
+            }
+        });
+    }
+
+    public static void main(String[] args) {
+        try {
+            createProcedures();
+            createDatabase();
+            createTable();
+            initApp();
+        } catch (ClassNotFoundException | UnsupportedLookAndFeelException | SQLException | InstantiationException | IllegalAccessException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void createDatabase() throws ClassNotFoundException, SQLException {
+        Class.forName("org.postgresql.Driver");
+
+        try (
+                Connection conn = DriverManager.getConnection(DB_URL, USER, PASS);
+                Statement stmt = conn.createStatement()
+        ) {
+            String sql = "CALL createDatabase();";
+            stmt.executeUpdate(sql);
+        } catch (SQLException e) {
+            if (e.getErrorCode() == 1007) {
+                System.out.println("Database already exists");
+            }
+        }
+        System.out.println("Database created successfully");
+    }
+
+    private static void deleteDatabase() throws SQLException {
+        try (
+                Connection conn = DriverManager.getConnection(DB_URL, USER, PASS)
+        ) {
+            conn.createStatement().executeQuery("CALL deleteDatabase();");
+            System.out.println("Database deleted successfully");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void createTable() throws SQLException {
+        try (
+                Connection conn = DriverManager.getConnection(DB_URL + DATABASE_NAME, USER, PASS)
+        ) {
+            conn.createStatement().executeUpdate("CALL createTable();");
+            System.out.println("Table created successfully");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void clearTable() throws SQLException {
+        try (
+                Connection conn = DriverManager.getConnection(DB_URL + DATABASE_NAME, USER, PASS);
+                Statement stmt = conn.createStatement()
+        ) {
+            String sql = "CALL clearTable();";
+            stmt.executeUpdate(sql);
+            System.out.println("Table cleared successfully");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void addSubject(String name, String teacher) throws SQLException {
+        try (
+                Connection conn = DriverManager.getConnection(DB_URL + DATABASE_NAME, USER, PASS);
+                PreparedStatement stmt = conn.prepareStatement("call addSubject(?, ?);");
+        ) {
+//            String sql = "CALL addStudent('" + firstName + "', '" + secondName + "'" + ");";
+            stmt.setString(1, name);
+            stmt.setString(2, teacher);
+            stmt.execute();
+            System.out.println("Subject added successfully");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void editSubject(String oldName, String name, String teacher) throws SQLException {
+        try (
+                Connection conn = DriverManager.getConnection(DB_URL + DATABASE_NAME, USER, PASS);
+                Statement stmt = conn.createStatement()
+        ) {
+            String sql = "CALL editSubject('" + oldName + "', '" + name + "', '" + teacher + "');";
+            stmt.executeUpdate(sql);
+            System.out.println("Subject updated successfully");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static List<String> getAllByName(String name) throws SQLException {
+        List<String> result = new ArrayList<>();
+        try (
+                Connection conn = DriverManager.getConnection(DB_URL + DATABASE_NAME, USER, PASS);
+                PreparedStatement stmt = conn.prepareStatement(
+                        "SELECT getAllByName(?);",
+                        ResultSet.TYPE_SCROLL_INSENSITIVE,
+                        ResultSet.CONCUR_READ_ONLY
+                )
+        ) {
+            stmt.setString(1, name);
+            ResultSet set = stmt.executeQuery();
+
+            while (set.next()) {
+                result.add(set.getString(1));
+            }
+
+            System.out.println("Subject selected successfully");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return result;
+    }
+
+    private static void deleteAllByName(String name) throws SQLException {
+        try (
+                Connection conn = DriverManager.getConnection(DB_URL + DATABASE_NAME, USER, PASS);
+                Statement stmt = conn.createStatement()
+        ) {
+            String sql = "CALL deleteAllByName('" + name + "')";
+            conn.createStatement().executeUpdate(sql);
+            System.out.println("Subject deleted successfully");
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void createProcedures() throws SQLException {
+        try (
+                Connection conn = DriverManager.getConnection(DB_URL + DATABASE_NAME, USER, PASS);
+                Statement stmt = conn.createStatement()
+        ) {
+            String createDatabaseQuery = "CREATE OR REPLACE PROCEDURE createDatabase() LANGUAGE SQL " +
+                    "AS $$ " +
+                    "CREATE DATABASE myDataBase; " +
+                    "$$;";
+            String deleteDatabaseQuery = "CREATE OR REPLACE PROCEDURE deleteDatabase() LANGUAGE SQL " +
+                    "AS $$ " +
+                    "DROP DATABASE myDataBase; " +
+                    "$$;";
+            String createTableQuery = "CREATE OR REPLACE PROCEDURE createTable() LANGUAGE SQL " +
+                    "AS $$ " +
+                    "CREATE TABLE IF NOT EXISTS subject(id SERIAL PRIMARY KEY, name text NOT NULL, teacher text NOT NULL); " +
+                    "$$;";
+            String clearTableQuery = "CREATE OR REPLACE PROCEDURE clearTable() LANGUAGE SQL " +
+                    "AS $$ " +
+                    "TRUNCATE TABLE subject; " +
+                    "$$;";
+            String addSubjectQuery = "CREATE OR REPLACE PROCEDURE addSubject(name TEXT, teacher TEXT) LANGUAGE SQL " +
+                    "AS $$ " +
+                    "INSERT INTO subject(name, teacher) VALUES(name, teacher); " +
+                    "$$;";
+            String editSubjectQuery = "CREATE OR REPLACE PROCEDURE editSubject(oldName TEXT, name1 TEXT, teacher1 TEXT) LANGUAGE SQL " +
+                    "AS $$ " +
+                    "UPDATE subject SET name = name1, teacher = teacher1 WHERE name = oldName; " +
+                    "$$;";
+            String getAllByNameQuery = "CREATE OR REPLACE FUNCTION getAllByName(name1 TEXT) RETURNS SETOF public.subject LANGUAGE SQL " +
+                    "AS $$ " +
+                    "SELECT * FROM subject WHERE name LIKE name1; " +
+                    "$$;";
+            String deleteAllByNameQuery = "CREATE OR REPLACE PROCEDURE deleteAllByName(name1 TEXT) LANGUAGE SQL " +
+                    "AS $$ " +
+                    "DELETE FROM subject WHERE name = name1; " +
+                    "$$;";
+            stmt.execute(createDatabaseQuery);
+            stmt.execute(deleteDatabaseQuery);
+            stmt.execute(createTableQuery);
+            stmt.execute(clearTableQuery);
+            stmt.execute(addSubjectQuery);
+            stmt.execute(editSubjectQuery);
+            stmt.execute(getAllByNameQuery);
+            stmt.execute(deleteAllByNameQuery);
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void initApp() throws UnsupportedLookAndFeelException, ClassNotFoundException, InstantiationException, IllegalAccessException {
+        JFrame frame = new JFrame("App");
+        frame.setContentPane(new App().panel1);
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        frame.setSize(700, 700);
+        frame.pack();
+        frame.setVisible(true);
+        frame.setLocationRelativeTo(null);
+    }
+}
